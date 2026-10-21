@@ -3,5 +3,5 @@
   <h2>Карта маршрута</h2>
   <p>Города по порядку: {{ cities | join(", ") }}</p>
   <p>Суммарное расстояние (по порядку): {{ distance_total | round(1) }} км</p>
-  <img src="{{ url_for('static', filename='map.png') }}" alt="Карта">
+  <img src="{{ url_for('static', filename='/img/map.png') }}" alt="Карта">
 {% endblock %}

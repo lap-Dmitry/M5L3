@@ -6,13 +6,12 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from config import DATABASE
 
 import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
-# ВАЖНО: именно так, чтобы работало cfeature.LAND
+import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
+matplotlib.use('Agg')
 app = Flask(__name__)
 app.secret_key = "dev-secret-key"
 
@@ -20,7 +19,6 @@ app.secret_key = "dev-secret-key"
 class DB_Map():
     def __init__(self, database):
         self.database = database
-        # Сразу создаём таблицу cities, если нет
         self.create_cities_table()
 
     def _get_conn(self):
@@ -48,56 +46,52 @@ class DB_Map():
             conn.commit()
 
     def add_city(self, user_id, city_name, lat=None, lng=None):
-        """
-        Если город уже есть — добавляет связь. Если нет — создаёт город.
-        lat/lng нужны при создании нового города.
-        """
         conn = self._get_conn()
         with conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, lat, lng FROM cities WHERE city=?", (city_name,))
+            cursor.execute("SELECT id, lat, lng FROM cities WHERE city=?",
+                           (city_name,))
             city_data = cursor.fetchone()
             if city_data:
                 city_id = city_data[0]
-                cursor.execute('INSERT OR IGNORE INTO users_cities VALUES (?, ?)', (user_id, city_id))
+                cursor.execute('''INSERT OR IGNORE INTO
+                               users_cities VALUES (?, ?)''',
+                               (user_id, city_id))
                 conn.commit()
                 return 1
             else:
                 if lat is None or lng is None:
-                    return 0  # не можем создать город без координат
-                cursor.execute('INSERT INTO cities (city, lat, lng) VALUES (?, ?, ?)',
+                    return 0
+                cursor.execute('''INSERT INTO cities
+                               (city, lat, lng) VALUES (?, ?, ?)''',
                                (city_name, lat, lng))
                 city_id = cursor.lastrowid
-                cursor.execute('INSERT INTO users_cities VALUES (?, ?)', (user_id, city_id))
+                cursor.execute('INSERT INTO users_cities VALUES (?, ?)',
+                               (user_id, city_id))
                 conn.commit()
                 return 1
-
 
     def remove_city(self, user_id, city_name):
         conn = self._get_conn()
         with conn:
             cursor = conn.cursor()
-            # Сначала получаем city_id по названию
             cursor.execute("SELECT id FROM cities WHERE city=?", (city_name,))
             row = cursor.fetchone()
             if not row:
-                return False  # города вообще нет в базе
+                return False
             city_id = row[0]
-            # Удаляем связь для этого пользователя
             cursor.execute(
                 "DELETE FROM users_cities WHERE user_id=? AND city_id=?",
                 (user_id, city_id)
             )
-            # Если хочешь, можно удалять город вообще, если его никто не использует:
-            # cursor.execute("DELETE FROM cities WHERE id=? AND NOT EXISTS (SELECT 1 FROM users_cities WHERE city_id=?)", (city_id, city_id))
             return True
 
     def select_cities(self, user_id):
         conn = self._get_conn()
         with conn:
             cursor = conn.cursor()
-            cursor.execute('''SELECT cities.city 
-                            FROM users_cities  
+            cursor.execute('''SELECT cities.city
+                            FROM users_cities
                             JOIN cities ON users_cities.city_id = cities.id
                             WHERE users_cities.user_id = ?''', (user_id,))
             cities = [row[0] for row in cursor.fetchall()]
@@ -108,7 +102,7 @@ class DB_Map():
         with conn:
             cursor = conn.cursor()
             cursor.execute('''SELECT lat, lng
-                            FROM cities  
+                            FROM cities
                             WHERE city = ?''', (city_name,))
             coordinates = cursor.fetchone()
             return coordinates
@@ -118,8 +112,8 @@ class DB_Map():
         phi1, phi2 = math.radians(lat1), math.radians(lat2)
         dphi = math.radians(lat2 - lat1)
         dlambda = math.radians(lon2 - lon1)
-
-        a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+        b2 = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2)
+        a = b2 * math.sin(dlambda / 2) ** 2
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return R * c
 
@@ -145,21 +139,25 @@ class DB_Map():
             ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
             ax.set_global()
             ax.coastlines()
-            
-            # Используем cfeature, а не cartopy.feature
-            ax.add_feature(cfeature.LAND, facecolor='lightgreen', edgecolor='black', alpha=0.7)
+            ax.add_feature(cfeature.LAND, facecolor='lightgreen',
+                           edgecolor='black', alpha=0.7)
             ax.add_feature(cfeature.OCEAN, facecolor='lightblue', alpha=0.6)
-            ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor='gray', alpha=0.5)
+            ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor='gray',
+                           alpha=0.5)
 
             if coords:
                 lons = [c[0] for c in coords]
                 lats = [c[1] for c in coords]
                 colors = plt.cm.viridis(np.linspace(0, 1, len(coords)))
-                ax.scatter(lons, lats, transform=ccrs.PlateCarree(), color=colors, s=100, edgecolors='black', linewidth=1.5, zorder=3)
-                
+                ax.scatter(lons, lats, transform=ccrs.PlateCarree(),
+                           color=colors, s=100, edgecolors='black',
+                           linewidth=1.5, zorder=3)
                 for i, city in enumerate(cities):
-                    ax.text(lons[i], lats[i] + 0.5, city, transform=ccrs.PlateCarree(), fontsize=11, ha='center', va='bottom',
-                            bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8))
+                    ax.text(lons[i], lats[i] + 0.5, city,
+                            transform=ccrs.PlateCarree(), fontsize=11,
+                            ha='center', va='bottom',
+                            bbox=dict(boxstyle="round,pad=0.3",
+                                      facecolor='white', alpha=0.8))
 
             plt.savefig(path, dpi=150, bbox_inches='tight')
             plt.close()
@@ -171,7 +169,8 @@ class DB_Map():
         ax.coastlines()
 
         # Цветной фон карты
-        ax.add_feature(cfeature.LAND, facecolor='lightgreen', edgecolor='black', alpha=0.7)
+        ax.add_feature(cfeature.LAND, facecolor='lightgreen',
+                       edgecolor='black', alpha=0.7)
         ax.add_feature(cfeature.OCEAN, facecolor='lightblue', alpha=0.6)
         ax.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='gray')
         ax.add_feature(cfeature.LAKES, facecolor='skyblue', alpha=0.5)
@@ -182,28 +181,33 @@ class DB_Map():
 
         colors = plt.cm.plasma(np.linspace(0, 1, len(cities)))
 
-        ax.scatter(lons, lats, transform=ccrs.PlateCarree(), color=colors, s=120, edgecolors='black', linewidth=1.5, alpha=0.9, zorder=5)
+        ax.scatter(lons, lats, transform=ccrs.PlateCarree(), color=colors,
+                   s=120, edgecolors='black', linewidth=1.5, alpha=0.9,
+                   zorder=5)
 
         for i in range(len(cities) - 1):
-            ax.plot([lons[i], lons[i+1]], [lats[i], lats[i+1]], transform=ccrs.PlateCarree(),
-                    color=plt.cm.plasma(i / (len(cities)-1)), linewidth=3, alpha=0.8, zorder=4, solid_capstyle='round')
+            ax.plot([lons[i], lons[i+1]], [lats[i], lats[i+1]],
+                    transform=ccrs.PlateCarree(),
+                    color=plt.cm.plasma(i / (len(cities)-1)), linewidth=3,
+                    alpha=0.8, zorder=4, solid_capstyle='round')
 
         for i, city in enumerate(cities):
-            ax.text(lons[i], lats[i] + 0.7, city, transform=ccrs.PlateCarree(), fontsize=11, fontweight='bold', ha='center', va='bottom',
-                    bbox=dict(boxstyle="round,pad=0.4", facecolor=plt.cm.plasma(i / len(cities)), alpha=0.9, edgecolor='black'), zorder=6)
+            ax.text(lons[i], lats[i] + 0.7, city, transform=ccrs.PlateCarree(),
+                    fontsize=11, fontweight='bold', ha='center', va='bottom',
+                    bbox=dict(boxstyle="round,pad=0.4",
+                              facecolor=plt.cm.plasma(i / len(cities)),
+                              alpha=0.9, edgecolor='black'), zorder=6)
 
-        ax.set_title('Маршрут по городам', fontsize=16, fontweight='bold', pad=20)
+        ax.set_title('Маршрут по городам', fontsize=16, fontweight='bold',
+                     pad=20)
         plt.savefig(path, dpi=150, bbox_inches='tight')
         plt.close()
 
 
-
-# Инициализация БД
 db = DB_Map(DATABASE)
 db.create_user_table()
 
 
-# Для примера добавим несколько городов, если их нет
 def seed_cities():
     sample_cities = [
         ("Москва", 55.7558, 37.6176),
@@ -219,7 +223,7 @@ def seed_cities():
                 cursor.execute("""INSERT INTO cities (city, lat, lng)
                                VALUES (?, ?, ?)""", (name, lat, lng))
             except sqlite3.IntegrityError:
-                pass  # город уже есть
+                pass
         conn.commit()
 
 
@@ -228,7 +232,7 @@ seed_cities()
 
 @app.route("/")
 def index():
-    user_id = 1  # для простоты фиксированный ID, можно заменить на сессию
+    user_id = 1
     cities = db.select_cities(user_id)
     return render_template("index.html", cities=cities, user_id=user_id)
 
@@ -240,9 +244,6 @@ def add_city():
     if not city_name:
         flash("Введите название города", "error")
         return redirect(url_for("index"))
-
-    # В реальном проекте координаты лучше брать из геокодера
-    # Если город из seed — координаты уже есть. Если новый
     added = db.add_city(user_id, city_name)
     if added:
         flash(f"Город {city_name} добавлен", "success")
@@ -272,14 +273,15 @@ def remove_city():
 def map_page():
     user_id = int(request.args.get("user_id", 1))
     cities = db.select_cities(user_id)
-    img_path = "static/map.png"
+    img_path = "static/img/map.png"
     db.create_graph(img_path, cities)
     distance_total = 0
     for i in range(len(cities) - 1):
         d = db.draw_distance(cities[i], cities[i+1])
         if d is not None:
             distance_total += d
-    return render_template("map.html", cities=cities, distance_total=distance_total, img_path=img_path)
+    return render_template("map.html", cities=cities,
+                           distance_total=distance_total, img_path=img_path)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,21 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 2rem;
+}
+
+nav {
+    margin-bottom: 1rem;
+}
+
+ul {
+    list-style: disc;
+    padding-left: 1.2rem;
+}
+
+.success {
+    color: green;
+}
+
+.error {
+    color: red;
+}
