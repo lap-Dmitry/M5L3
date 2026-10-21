@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Ваши города</h2>
+  <ul>
+    {% for city in cities %}
+      <li>
+        {{ city }}
+        <form method="post" action="{{ url_for('remove_city') }}" style="display:inline;">
+          <input type="hidden" name="user_id" value="{{ user_id }}">
+          <input type="hidden" name="city_name" value="{{ city }}">
+          <button type="submit" style="margin-left:10px; color:red;">Удалить</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h3>Добавить город</h3>
+  <form method="post" action="{{ url_for('add_city') }}">
+    <input type="hidden" name="user_id" value="{{ user_id }}">
+    <input type="text" name="city_name" placeholder="Название города" required>
+    <button type="submit">Добавить</button>
+  </form>
+{% endblock %}
