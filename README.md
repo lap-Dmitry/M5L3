@@ -1,2 +1,5 @@
 # M5L2
-test
+> Для установки библиотек желателен python 3.11<br>
+## Команды для установки:
+> pip install -r requirements.txt <br>
+> pip install flask matplotlib cartopy numpy
